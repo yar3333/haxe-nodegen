@@ -1,4 +1,4 @@
-Tool to generate nodejs module from haxe
+Tool to generate nodejs module from Haxe
 ========================================
 
 Generate:
