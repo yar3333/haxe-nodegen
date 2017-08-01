@@ -23,3 +23,9 @@ where `<options>` may be:
 	
 Tool read `*.hxproj` from the current directory and use classpaths and libraries from it.
 If you don't use HaxeDevelop/FlashDevelop - just specify `-cp` and `-lib` haxe compiler options in `<haxe_compiler_options>` agrument.
+
+Example:
+
+```shell
+haxelib run nodegen wquery hxnodejs-wquery --raw-module wquery.Macro -- -lib hant -cp src
+```
