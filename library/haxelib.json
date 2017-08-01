@@ -1,0 +1,11 @@
+{
+  "name": "nodegen",
+  "license": "LGPL",
+  "tags": ["node","nodejs","npm","module"],
+  "description": "Tool to generate nodejs module from haxe sources.",
+  "contributors": ["yar3333"],
+  "releasenote": "",
+  "version": "1.0.0",
+  "url": "https://bitbucket.org/yar3333/haxe-nodegen",
+  "dependencies": {}
+}
