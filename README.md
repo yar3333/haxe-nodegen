@@ -8,7 +8,7 @@ Generate:
  * haxe externals - "extern" classes for using module from Haxe
 
 Using: `haxelib run nodegen [<options>] <package> <module> [ -- <haxe_compiler_options> ]`
-where <options> may be:
+where `<options>` may be:
 
 	--no-haxe        Don't generate haxe externals.
 	--no-typescript  Don't generate typescript definitions.
@@ -18,5 +18,5 @@ where <options> may be:
 	<package>        Source haxe package to expose.
 	<module>         Result nodejs module name.
 	
-Tool read *.hxproj from the current directory and use classpaths and libraries from it.
-If you don't use HaxeDevelop/FlashDevelop - just specify "-cp" and "-lib" haxe compiler options in `<haxe_compiler_options>` agrument.
+Tool read `*.hxproj` from the current directory and use classpaths and libraries from it.
+If you don't use HaxeDevelop/FlashDevelop - just specify `-cp` and `-lib` haxe compiler options in `<haxe_compiler_options>` agrument.
