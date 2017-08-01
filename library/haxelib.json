@@ -5,7 +5,7 @@
   "description": "Tool to generate nodejs module from haxe sources.",
   "contributors": ["yar3333"],
   "releasenote": "Don't remove link to source map silently. Disable `debug` to avoid source map generation.",
-  "version": "1.0/1",
+  "version": "1.0.1",
   "url": "https://bitbucket.org/yar3333/haxe-nodegen",
   "dependencies": {}
 }
