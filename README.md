@@ -8,6 +8,7 @@ Generate:
  * haxe externals - "extern" classes for using module from Haxe
 
 Usage: `haxelib run nodegen [<options>] <package> <module> [ -- <haxe_compiler_options> ]`
+
 where `<options>` may be:
 
 	--no-haxe        Don't generate haxe externals.
