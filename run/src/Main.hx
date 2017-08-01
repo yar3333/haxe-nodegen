@@ -115,25 +115,12 @@ class Main
 		
 		Sys.println("\nBuild JavaScript to \"" + project.outputPath + "\":");
 		
-		var r = project.build
+		return project.build
 		([
 			"-lib", "nodegen",
 			"--macro", "nodegen.Macro.expose('" + pack + "','')",
-			//"-dce", "full",
-			//"--macro", "keep('" + pack + "')",
 			"--macro", "include('" + pack + "')"
 		]);
-		
-		if (r != 0) return r;
-		
-		var strToTrim = "//# sourceMappingURL=index.js.map";
-		var text = File.getContent(project.outputPath);
-		if (text.endsWith(strToTrim))
-		{
-			File.saveContent(project.outputPath, text.substr(0, text.length - strToTrim.length).rtrim());
-		}
-		
-		return 0;
 	}
 	
 	static function buildHaxeExternals(project:FlashDevelopProject, pack:String, destDirectory:String, module:String, rawModules:Array<String>)
