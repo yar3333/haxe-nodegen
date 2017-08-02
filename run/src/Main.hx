@@ -32,13 +32,13 @@ class Main
         
 		var options = new CmdOptions();
 		
-		options.add("noHaxe", false, [ "--no-haxe" ], "Don't generate haxe externals.");
-		options.add("noTypeScript", false, [ "--no-typescript" ], "Don't generate typescript definitions.");
-		options.add("ignoreHxproj", false, [ "--ignore-hxproj" ], "Don't read haxe options from hxproj file. Default is read *.hxproj from the current directory if exactly one exists.");
-		options.add("destDirectory", "hxnodejs", [ "--dest-directory" ], "Destination directory. Default is 'hxnodejs'.");
-		options.addRepeatable("rawModules", String, [ "--raw-module" ], "Haxe module name to copy to haxe externals as is. You can use this option several times.");
 		options.add("package", "", "Source haxe package to expose.");
-		options.add("module", "", "Result nodejs module name.");
+		options.add("module", "", "Result node module name.");
+		options.add("jsFile", "", [ "-js" ], "Destination file name for JavaScript.");
+		options.add("hxDir", "", [ "-hx" ], "Destination directory for Haxe externals.");
+		options.add("tsFile", "", [ "-ts" ], "Destination file name for TypeScript definitions.");
+		options.addRepeatable("rawHaxeModules", String, [ "--raw-haxe-module" ], "Haxe module name to copy to Haxe externals as is. You can use this option several times.");
+		options.add("ignoreHxproj", false, [ "--ignore-hxproj" ], "Don't read haxe options from HaxeDevelop/FlashDevelop hxproj file.\nDefault is read *.hxproj from the current directory if exactly one exists.");
 		
 		if (args.length > 0 && (args.length != 1 || args[0] != "--help"))
 		{
@@ -69,7 +69,25 @@ class Main
 				project.platform = "JavaScript";
 				project.additionalCompilerOptions = project.additionalCompilerOptions.concat(compilerOptions);
 				
-				return build(project, options.get("package"), options.get("module"), options.get("destDirectory"), options.get("rawModules"), options.get("noHaxe"), options.get("noTypeScript"));
+				if (options.get("jsFile") != "")
+				{
+					var r = buildJavaScript(project, options.get("package"), options.get("jsFile"));
+					if (r != 0) return r;
+				}
+				
+				if (options.get("hxDir") != "")
+				{
+					var r = buildHaxeExternals(project, options.get("package"), options.get("hxDir"), options.get("module"), options.get("rawHaxeModules"));
+					if (r != 0) return r;
+				}
+				
+				if (options.get("tsFile") != "")
+				{
+					var r = buildTypeScript(project, options.get("package"), options.get("tsFile"));
+					if (r != 0) return r;
+				}
+				
+				return 0;
 			}
 			catch (e:AmbiguousProjectFilesException)
 			{
@@ -87,31 +105,9 @@ class Main
 		return 1;
 	}
 	
-	static function build(project:FlashDevelopProject, pack:String, module:String, destDirectory:String, rawModules:Array<String>, noHaxe:Bool, noTypeScript:Bool) : Int
+	static function buildJavaScript(project:FlashDevelopProject, pack:String, destFile:String)
 	{
-		var r : Int;
-		
-		r = buildJavaScript(project, pack, destDirectory);
-		if (r != 0) return r;
-		
-		if (!noHaxe)
-		{
-			r = buildHaxeExternals(project, pack, destDirectory, module, rawModules);
-			if (r != 0) return r;
-		}
-		
-		if (!noTypeScript)
-		{
-			r = buildTypeScript(project, pack, destDirectory);
-			if (r != 0) return r;
-		}
-		
-		return r;
-	}
-	
-	static function buildJavaScript(project:FlashDevelopProject, pack:String, destDirectory:String)
-	{
-		project.outputPath = Path.join([ destDirectory, "index.js" ]);
+		project.outputPath = destFile;
 		
 		Sys.println("\nBuild JavaScript to \"" + project.outputPath + "\":");
 		
@@ -155,10 +151,8 @@ class Main
 		return 0;
 	}
 	
-	static function buildTypeScript(project:FlashDevelopProject, pack:String, destDirectory:String)
+	static function buildTypeScript(project:FlashDevelopProject, pack:String, destFile:String)
 	{
-		var destFile = Path.join([ destDirectory, "index.d.ts" ]);
-		
 		Sys.println("\nBuild TypeScript definitions to \"" + destFile + "\":");
 		
 		return project.build
