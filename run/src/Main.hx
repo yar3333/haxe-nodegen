@@ -4,10 +4,12 @@ import hant.CmdOptions;
 import hant.Haxelib;
 import hant.Log;
 import hant.Process;
+import haxe.Json;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 using StringTools;
+using Lambda;
 
 class Main 
 {
@@ -33,12 +35,14 @@ class Main
 		var options = new CmdOptions();
 		
 		options.add("package", "", "Source haxe package to expose.");
-		options.add("module", "", "Result node module name.");
-		options.add("jsFile", "", [ "-js" ], "Destination file name for JavaScript.");
+		options.add("module", "", "Result node module name.\nSpecify '*' to use `name` field from the `package.json`.");
+		options.add("hxproj", "", "FlashDevelop/HaxeDevelop project file ro read Haxe compiler options.");
+		options.add("jsFile", "", [ "-js" ], "Destination file name for JavaScript. Like `index.js`.");
 		options.add("hxDir", "", [ "-hx" ], "Destination directory for Haxe externals.\nUse 'haxelib:' prefix to detect directory of specified Haxe library.");
-		options.add("tsFile", "", [ "-ts" ], "Destination file name for TypeScript definitions.");
+		options.add("tsFile", "", [ "-ts" ], "Destination file name for TypeScript definitions. Like `index.d.ts`.");
+		options.add("noPreBuild", false, [ "--no-pre-build" ], "Skip pre-build step from *.hxproj file.");
+		options.add("noPostBuild", false, [ "--no-post-build" ], "Skip post-build step from *.hxproj file.");
 		options.addRepeatable("rawHaxeModules", String, [ "--raw-haxe-module" ], "Haxe module name to copy to Haxe externals as is.\nYou can use this option several times.\nUse 'file:' prefix to read module names from specified text file.");
-		options.add("ignoreHxproj", false, [ "--ignore-hxproj" ], "Don't read haxe options from HaxeDevelop/FlashDevelop hxproj file.\nDefault is read *.hxproj from the current directory if exactly one exists.");
 		options.add("verbose", false, [ "-v" ], "Verbose.");
 		
 		if (args.length > 0 && (args.length != 1 || args[0] != "--help"))
@@ -53,8 +57,19 @@ class Main
 			
 			options.parse(args);
 			
-			if (options.get("package") == "") fail("<package> argument must be specified.");
-			if (options.get("module") == "") fail("<module> argument must be specified.");
+			var pack : String = options.get("package");
+			if (pack == "") fail("<package> argument must be specified.");
+			
+			var module : String = options.get("module");
+			if (module == "") fail("<module> argument must be specified.");
+			if (module == "*") module = readModuleNameFromPackageJson();
+			
+			var hxproj : String = options.get("hxproj");
+			if (hxproj.endsWith("*.hxproj")) hxproj = detectHxprojFilePath(hxproj);
+			else if (hxproj == "") hxproj = null;
+			
+			var noPreBuild = options.get("noPreBuild");
+			var noPostBuild = options.get("noPostBuild");
 			
 			if (Haxelib.getPath("codegen") == null)
 			{
@@ -64,15 +79,18 @@ class Main
 			
 			try
 			{
-				var project = !options.get("ignoreHxproj") ? FlashDevelopProject.load("") : null;
+				var project = hxproj != null ? FlashDevelopProject.load(hxproj) : null;
 				if (project == null) project = new FlashDevelopProject();
 				project.outputType = "Application";
 				project.platform = "JavaScript";
 				project.additionalCompilerOptions = project.additionalCompilerOptions.concat(compilerOptions);
 				
+				if (noPreBuild) project.preBuildCommand = "";
+				if (noPostBuild) project.postBuildCommand = "";
+				
 				if (options.get("jsFile") != "")
 				{
-					var r = buildJavaScript(project, options.get("package"), options.get("jsFile"));
+					var r = buildJavaScript(project, pack, options.get("jsFile"));
 					if (r != 0) return r;
 				}
 				
@@ -89,13 +107,13 @@ class Main
 						else rawHaxeModules.push(s);
 					}
 					
-					var r = buildHaxeExternals(project, options.get("package"), hxDir, options.get("module"), rawHaxeModules, options.get("verbose"));
+					var r = buildHaxeExternals(project, pack, hxDir, module, rawHaxeModules, options.get("verbose"));
 					if (r != 0) return r;
 				}
 				
 				if (options.get("tsFile") != "")
 				{
-					var r = buildTypeScript(project, options.get("package"), options.get("tsFile"), options.get("verbose"));
+					var r = buildTypeScript(project, pack, options.get("tsFile"), options.get("verbose"));
 					if (r != 0) return r;
 				}
 				
@@ -109,7 +127,7 @@ class Main
 		else
 		{
 			Sys.println("nodegen is a tool to build nodejs modules.");
-			Sys.println("Usage: haxelib run nodegen [<options>] <package> <module> [ -- <haxe_compiler_options> ]");
+			Sys.println("Usage: haxelib run nodegen [<options>] <package> <module> [ <project.hxproj> ] [ -- <haxe_compiler_options> ]");
 			Sys.println("where <options> may be:");
 			Sys.println(options.getHelpMessage());
 		}
@@ -194,6 +212,23 @@ class Main
 		lines = lines.map(StringTools.trim);
 		lines = lines.filter(function(s) return s != "");
 		return lines;
+	}
+	
+	static function readModuleNameFromPackageJson() : String
+	{
+		if (!FileSystem.exists("package.json")) fail("Problem to fill <module> argument: can't find `package.json` in the current directory.");
+		var json = Json.parse(File.getContent("package.json"));
+		if (json == null || json.name == null || json.name == "") fail("Problem to fill <module> argument: field `name` in the `package.json` not exist or empty.");
+		return json.name;
+	}
+	
+	static function detectHxprojFilePath(maskPath:String) : String
+	{
+		var dir = Path.directory(maskPath);
+		var files = FileSystem.readDirectory(dir).filter(function(x) return x.endsWith(".hxproj"));
+		if (files.length == 0) fail("Problem detecting *.hxproj: no files found.");
+		if (files.length > 1) fail("Problem detecting *.hxproj: several files found.");
+		return Path.join([ dir, files[0] ]);
 	}
 	
 	static function fail(message:String)
