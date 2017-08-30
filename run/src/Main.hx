@@ -43,6 +43,7 @@ class Main
 		options.add("noPreBuild", false, [ "--no-pre-build" ], "Skip pre-build step from *.hxproj file.");
 		options.add("noPostBuild", false, [ "--no-post-build" ], "Skip post-build step from *.hxproj file.");
 		options.addRepeatable("rawHaxeModules", String, [ "--raw-haxe-module" ], "Haxe module name to copy to Haxe externals as is.\nYou can use this option several times.\nUse 'file:' prefix to read module names from specified text file.");
+		options.add("lazy", false, [ "--lazy" ], "Skip building if source files are not changed from the last build.");
 		options.add("verbose", false, [ "-v" ], "Verbose.");
 		
 		if (args.length > 0 && (args.length != 1 || args[0] != "--help"))
@@ -71,10 +72,13 @@ class Main
 			var noPreBuild = options.get("noPreBuild");
 			var noPostBuild = options.get("noPostBuild");
 			
+			var lazy : Bool = options.get("lazy");
+			var verbose : Bool = options.get("verbose");
+			
 			if (Haxelib.getPath("codegen") == null)
 			{
-				Sys.println("");
 				if (Process.run("haxelib", [ "install", "codegen" ]).exitCode != 0) return 2;
+				Sys.println("");
 			}
 			
 			try
@@ -88,9 +92,11 @@ class Main
 				if (noPreBuild) project.preBuildCommand = "";
 				if (noPostBuild) project.postBuildCommand = "";
 				
+				var lastModificationOfSources = lazy ? getLastModificationOfSources(project) : null;
+				
 				if (options.get("jsFile") != "")
 				{
-					var r = buildJavaScript(project, pack, options.get("jsFile"));
+					var r = buildJavaScript(project, pack, options.get("jsFile"), lastModificationOfSources);
 					if (r != 0) return r;
 				}
 				
@@ -107,13 +113,13 @@ class Main
 						else rawHaxeModules.push(s);
 					}
 					
-					var r = buildHaxeExternals(project, pack, hxDir, module, rawHaxeModules, options.get("verbose"));
+					var r = buildHaxeExternals(project, pack, hxDir, module, rawHaxeModules, lastModificationOfSources, verbose);
 					if (r != 0) return r;
 				}
 				
 				if (options.get("tsFile") != "")
 				{
-					var r = buildTypeScript(project, pack, options.get("tsFile"), options.get("verbose"));
+					var r = buildTypeScript(project, pack, options.get("tsFile"), lastModificationOfSources, verbose);
 					if (r != 0) return r;
 				}
 				
@@ -135,25 +141,54 @@ class Main
 		return 1;
 	}
 	
-	static function buildJavaScript(project:FlashDevelopProject, pack:String, destFile:String)
+	static function buildJavaScript(project:FlashDevelopProject, pack:String, destFile:String, lastModificationOfSources:Date)
 	{
-		project.outputPath = destFile;
+		project.outputPath = fixPathDueProjectDirectory(project, destFile);
 		
-		Sys.println("\nBuild JavaScript to \"" + project.outputPath + "\":");
+		Sys.print("Build JavaScript to \"" + destFile + "\":");
 		
-		return project.build
+		if (lastModificationOfSources != null)
+		{
+			if (FileSystem.exists(destFile) && FileSystem.stat(destFile).mtime.getTime() >= lastModificationOfSources.getTime())
+			{
+				Sys.println(" SKIP");
+				Sys.println("");
+				return 0;
+			}
+		}
+		
+		Sys.println("");
+		
+		var r = project.build
 		([
 			"-lib", "nodegen",
 			"--macro", "nodegen.Macro.expose('" + pack + "','')",
 			"--macro", "include('" + pack + "')"
 		]);
+		
+		Sys.println("");
+		
+		return r;
 	}
 	
-	static function buildHaxeExternals(project:FlashDevelopProject, pack:String, destDirectory:String, module:String, rawModules:Array<String>, verbose:Bool)
+	static function buildHaxeExternals(project:FlashDevelopProject, pack:String, destDirectory:String, module:String, rawModules:Array<String>, lastModificationOfSources:Date, verbose:Bool)
 	{
 		var destPackDir = Path.join([ destDirectory, pack.replace(".", "/") ]);
 		
-		Sys.println("\nBuild Haxe externals to \"" + destPackDir + "\":");
+		Sys.print("Build Haxe externals to \"" + destPackDir + "\":");
+		
+		if (lastModificationOfSources != null)
+		{
+			var destFileLastDate = getLastModificationOfDir(destPackDir);
+			if (destFileLastDate != null && destFileLastDate.getTime() >= lastModificationOfSources.getTime())
+			{
+				Sys.println(" SKIP");
+				Sys.println("");
+				return 0;
+			}
+		}
+		
+		Sys.println("");
 		
 		FileSystemTools.deleteDirectory(destPackDir, false);
 		
@@ -161,7 +196,7 @@ class Main
 		if (verbose) options = options.concat([ "--macro", "CodeGen.set('verbose', true)" ]);
 		options = options.concat
 		([
-			"--macro", "CodeGen.set('outPath', '" + destDirectory + "')",
+			"--macro", "CodeGen.set('outPath', '" + fixPathDueProjectDirectory(project, destDirectory) + "')",
 			"--macro", "CodeGen.set('applyNatives', false)",
 			"--macro", "CodeGen.include('" + pack + "')",
 			"--macro", "CodeGen.exclude('" + rawModules.join(",") + "')",
@@ -182,18 +217,32 @@ class Main
 			if (srcPath != null) FileSystemTools.copyFile(srcPath, Path.join([ destDirectory, relPath ]), true);
 		}
 		
+		Sys.println("");
+		
 		return 0;
 	}
 	
-	static function buildTypeScript(project:FlashDevelopProject, pack:String, destFile:String, verbose:Bool)
+	static function buildTypeScript(project:FlashDevelopProject, pack:String, destFile:String, lastModificationOfSources:Date, verbose:Bool)
 	{
-		Sys.println("\nBuild TypeScript definitions to \"" + destFile + "\":");
+		Sys.print("Build TypeScript definitions to \"" + destFile + "\":");
+		
+		if (lastModificationOfSources != null)
+		{
+			if (FileSystem.exists(destFile) && FileSystem.stat(destFile).mtime.getTime() >= lastModificationOfSources.getTime())
+			{
+				Sys.println(" SKIP");
+				Sys.println("");
+				return 0;
+			}
+		}
+		
+		Sys.println("");
 		
 		var options = [ "-lib", "codegen" ];
 		if (verbose) options = options.concat([ "--macro", "CodeGen.set('verbose', true)" ]);
 		options = options.concat
 		([
-			"--macro", "CodeGen.set('outPath', '" + destFile + "')",
+			"--macro", "CodeGen.set('outPath', '" + fixPathDueProjectDirectory(project, destFile) + "')",
 			"--macro", "CodeGen.set('applyNatives', false)",
 			"--macro", "CodeGen.include('" + pack + "')",
 			"--macro", "CodeGen.set('includePrivate', true)",
@@ -201,7 +250,12 @@ class Main
 			"--macro", "CodeGen.generate('typescriptExtern')",
 			"--macro", "include('" + pack + "')"
 		]);
-		return project.build(options);
+		
+		var r = project.build(options);
+		
+		Sys.println("");
+		
+		return r;
 	}
 	
 	static function readLinesFromFile(filePath:String)
@@ -229,6 +283,62 @@ class Main
 		if (files.length == 0) fail("Problem detecting *.hxproj: no files found.");
 		if (files.length > 1) fail("Problem detecting *.hxproj: several files found.");
 		return Path.join([ dir, files[0] ]);
+	}
+	
+	static function getLastModificationOfSources(project:FlashDevelopProject) : Date
+	{
+		var r = Date.fromTime(0);
+		
+		for (path in project.getAllClassPaths(false))
+		{
+			var d = getLastModificationOfDir(fixPathDueProjectDirectory2(project, path));
+			if (d != null && d.getTime() > r.getTime()) r = d;
+		}
+		
+		return r;
+	}
+	
+	static function getLastModificationOfDir(path:String) : Date
+	{
+		if (!FileSystem.exists(path)) return null;
+		
+		var r = FileSystem.stat(path).mtime;
+		
+		FileSystemTools.findFiles
+		(
+			path,
+			function(file)
+			{
+				var d = FileSystem.stat(file).mtime;
+				if (d.getTime() > r.getTime()) r = d;
+			},
+			function(dir)
+			{
+				var d = FileSystem.stat(dir).mtime;
+				if (d.getTime() > r.getTime()) r = d;
+				
+				return true;
+			},
+			false
+		);
+		
+		return r;
+	}
+	
+	static function fixPathDueProjectDirectory(project:FlashDevelopProject, path:String) : String
+	{
+		if (Path.isAbsolute(path)) return path;
+		var dir = Path.directory(project.projectFilePath);
+		if (dir == "") return path;
+		return FileSystem.absolutePath(path);
+	}
+	
+	static function fixPathDueProjectDirectory2(project:FlashDevelopProject, path:String) : String
+	{
+		if (Path.isAbsolute(path)) return path;
+		var dir = Path.directory(project.projectFilePath);
+		if (dir == "") return path;
+		return Path.join([ dir, path ]);
 	}
 	
 	static function fail(message:String)
