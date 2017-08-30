@@ -328,6 +328,7 @@ class Main
 	static function fixPathDueProjectDirectory(project:FlashDevelopProject, path:String) : String
 	{
 		if (Path.isAbsolute(path)) return path;
+		if (project.projectFilePath == null || project.projectFilePath == "") return path;
 		var dir = Path.directory(project.projectFilePath);
 		if (dir == "") return path;
 		return FileSystem.absolutePath(path);
@@ -336,6 +337,7 @@ class Main
 	static function fixPathDueProjectDirectory2(project:FlashDevelopProject, path:String) : String
 	{
 		if (Path.isAbsolute(path)) return path;
+		if (project.projectFilePath == null || project.projectFilePath == "") return path;
 		var dir = Path.directory(project.projectFilePath);
 		if (dir == "") return path;
 		return Path.join([ dir, path ]);
