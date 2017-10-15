@@ -77,7 +77,14 @@ class Main
 			
 			if (Haxelib.getPath("codegen") == null)
 			{
-				if (Process.run("haxelib", [ "install", "codegen" ]).exitCode != 0) return 2;
+				var saveDir = hxproj != null && Path.directory(hxproj) != "" ? Sys.getCwd() : null;
+				if (saveDir != null) Sys.setCwd(Path.directory(hxproj));
+				if (Process.run("haxelib", [ "install", "codegen" ]).exitCode != 0)
+				{
+					if (saveDir != null) Sys.setCwd(saveDir);
+					return 2;
+				}
+				if (saveDir != null) Sys.setCwd(saveDir);
 				Sys.println("");
 			}
 			
