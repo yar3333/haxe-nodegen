@@ -13,7 +13,7 @@ using Lambda;
 
 class Main 
 {
-	static function main() 
+	static function main() : Void
 	{
         var args = Sys.args();
 		
@@ -82,7 +82,8 @@ class Main
 				if (Process.run("haxelib", [ "install", "codegen" ]).exitCode != 0)
 				{
 					if (saveDir != null) Sys.setCwd(saveDir);
-					return 2;
+                    Sys.exit(2);
+					return;
 				}
 				if (saveDir != null) Sys.setCwd(saveDir);
 				Sys.println("");
@@ -104,7 +105,7 @@ class Main
 				if (options.get("jsFile") != "")
 				{
 					var r = buildJavaScript(project, pack, options.get("jsFile"), lastModificationOfSources);
-					if (r != 0) return r;
+					if (r != 0) { Sys.exit(r); return; }
 				}
 				
 				if (options.get("hxDir") != "")
@@ -121,16 +122,17 @@ class Main
 					}
 					
 					var r = buildHaxeExternals(project, pack, hxDir, module, rawHaxeModules, lastModificationOfSources, verbose);
-					if (r != 0) return r;
+					if (r != 0) { Sys.exit(r); return; }
 				}
 				
 				if (options.get("tsFile") != "")
 				{
 					var r = buildTypeScript(project, pack, options.get("tsFile"), lastModificationOfSources, verbose);
-					if (r != 0) return r;
+					if (r != 0) { Sys.exit(r); return; }
 				}
 				
-				return 0;
+				Sys.exit(0);
+                return;
 			}
 			catch (e:AmbiguousProjectFilesException)
 			{
@@ -145,7 +147,7 @@ class Main
 			Sys.println(options.getHelpMessage());
 		}
 		
-		return 1;
+		Sys.exit(1);
 	}
 	
 	static function buildJavaScript(project:FlashDevelopProject, pack:String, destFile:String, lastModificationOfSources:Date)
