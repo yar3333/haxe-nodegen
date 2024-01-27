@@ -4,8 +4,8 @@
   "tags": ["node","nodejs","npm","module"],
   "description": "Tool to generate nodejs module from haxe sources.",
   "contributors": ["yar3333"],
-  "releasenote": "README fix",
-  "version": "2.0.2",
+  "releasenote": "DEPRECATED. Please, use `codegen` library.",
+  "version": "2.0.3",
   "url": "https://github.com/yar3333/haxe-nodegen",
   "dependencies": {}
 }

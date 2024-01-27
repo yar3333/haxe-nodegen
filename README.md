@@ -1,6 +1,8 @@
 Tool to generate nodejs module from Haxe
 ========================================
 
+DEPRECATED. Please, use `codegen` library.
+
 Generate:
 
  * index.js - result of the compilation
